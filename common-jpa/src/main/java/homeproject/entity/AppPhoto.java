@@ -1,8 +1,10 @@
 package homeproject.entity;
 
+
 import lombok.*;
 
 import javax.persistence.*;
+
 @Getter
 @Setter
 @EqualsAndHashCode(exclude = "id")
@@ -10,16 +12,15 @@ import javax.persistence.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Table(name = "app_document")
-public class AppDoc {
+@Table(name = "app_photo")
+public class AppPhoto {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String telegramFiled;
-    private String docName;
-
     @OneToOne
     private BinaryContent binaryContent;
-    private String mimeType;
-    private Long fileSize;
+    private Integer fileSize;
+
 }

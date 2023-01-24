@@ -3,6 +3,7 @@ package homeproject.service.impl;
 import homeproject.dao.AppUserDAO;
 import homeproject.dao.RawDataDAO;
 import homeproject.entity.AppDoc;
+import homeproject.entity.AppPhoto;
 import homeproject.entity.AppUser;
 import homeproject.entity.RawData;
 import homeproject.service.FileService;
@@ -51,7 +52,7 @@ public class MainServiceImpl implements MainService {
         } else if (BASIC_STATE.equals(userState)) {
             output = processServiceCommand(appUser, text);
         } else if (WAIT_FOR_EMAIL_STATE.equals(userState)) {
-            //TODO
+
         } else {
             log.error("Unknown user state: " + userState);
             output = "Неизвестная ошибка! Введите /cansel и попробуйте снова!";
@@ -71,8 +72,15 @@ public class MainServiceImpl implements MainService {
         if (isNotAllowToSendContent(chatId, appUser)) {
             return;
         }
-        var answer = "Фото успешно загружено! Ссылка на скачивание: http://homeproject.ru/get-photo/1337";
-        sendAnswer(answer, chatId);
+        try{
+            AppPhoto photo = fileService.processPhoto(update.getMessage());
+            var answer = "Фото успешно загружено! Ссылка на скачивание: http://homeproject.ru/get-photo/1337";
+            sendAnswer(answer, chatId);
+        } catch (Exception ex){
+            log.error(ex);
+            String error = "Загрузка файла не удалась. Повторите попытку";
+            sendAnswer(error,chatId);
+        }
     }
 
     private boolean isNotAllowToSendContent(Long chatId, AppUser appUser) {

@@ -1,8 +1,10 @@
 package homeproject.service.impl;
 
-import homeproject.dao.AppDocDao;
+import homeproject.dao.AppDocDAO;
+import homeproject.dao.AppPhotoDAO;
 import homeproject.dao.BinaryContentDao;
 import homeproject.entity.AppDoc;
+import homeproject.entity.AppPhoto;
 import homeproject.entity.BinaryContent;
 import homeproject.service.FileService;
 import lombok.extern.log4j.Log4j;
@@ -13,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.telegram.telegrambots.meta.api.objects.Document;
 import org.telegram.telegrambots.meta.api.objects.Message;
+import org.telegram.telegrambots.meta.api.objects.PhotoSize;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,12 +31,14 @@ public class FileServiceImpl implements FileService {
     private String fileInfoUri;
     @Value("${service.file_storage.uri}")
     private String fileStorageUri;
-    private final AppDocDao appDocDao;
-//    private final AppPhotoDAO appPhotoDAO;
+    private final AppDocDAO appDocDao;
+    private final AppPhotoDAO appPhotoDAO;
     private final BinaryContentDao binaryContentDao;
 
-    public FileServiceImpl(AppDocDao appDocDao, BinaryContentDao binaryContentDao) {
+
+    public FileServiceImpl(AppDocDAO appDocDao, AppPhotoDAO appPhotoDAO, BinaryContentDao binaryContentDao) {
         this.appDocDao = appDocDao;
+        this.appPhotoDAO = appPhotoDAO;
         this.binaryContentDao = binaryContentDao;
     }
 
@@ -47,7 +52,7 @@ public class FileServiceImpl implements FileService {
             BinaryContent persistentBinaryContent = getPersistentBinaryContent(response);
             AppDoc transientAppDoc = buildTransientAppDoc(telegramDoc, persistentBinaryContent);
             return appDocDao.save(transientAppDoc);
-        }else{
+        } else {
             try {
                 throw new Exception("Bad response" + response);
             } catch (Exception e) {
@@ -55,6 +60,35 @@ public class FileServiceImpl implements FileService {
             }
         }
     }
+
+    @Override
+    public AppPhoto processPhoto(Message telegramMessage) {
+        var photoSizeCount = telegramMessage.getPhoto().size();
+        var photoIndex = photoSizeCount > 1 ? telegramMessage.getPhoto().size() - 1 : 0;
+        PhotoSize telegramPhoto = telegramMessage.getPhoto().get(photoIndex);
+        String fileId = telegramPhoto.getFileId();
+        ResponseEntity<String> response = getFilePath(fileId);
+        if (response.getStatusCode() == HttpStatus.OK) {
+            BinaryContent persistentBinaryContent = getPersistentBinaryContent(response);
+            AppPhoto transientAppPhoto = buildTransientAppPhoto(telegramPhoto, persistentBinaryContent);
+            return appPhotoDAO.save(transientAppPhoto);
+        } else {
+            try {
+                throw new Exception("Bad response" + response);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    private AppPhoto buildTransientAppPhoto(PhotoSize telegramPhoto, BinaryContent persistentBinaryContent) {
+        return AppPhoto.builder()
+                .telegramFiled(telegramPhoto.getFileId())
+                .binaryContent(persistentBinaryContent)
+                .fileSize(telegramPhoto.getFileSize())
+                .build();
+    }
+
 
     private AppDoc buildTransientAppDoc(Document telegramDoc, BinaryContent persistentBinaryContent) {
         return AppDoc.builder()
@@ -88,8 +122,6 @@ public class FileServiceImpl implements FileService {
         } catch (MalformedURLException e) {
             throw new RuntimeException(e);
         }
-
-        //TODO подумать над оптимизацией
         try (InputStream is = urlObj.openStream()) {
             return is.readAllBytes();
         } catch (IOException e) {
